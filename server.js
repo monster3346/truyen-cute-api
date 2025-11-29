@@ -39,9 +39,10 @@ app.use(cors({
 }));
 
 // Rate limit
+// Tăng lên nếu có nhiều user
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
-  max: 300,                 // tăng lên cho admin thoải mái thêm chương
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
   message: 'Quá nhiều request, vui lòng thử lại sau.'
 });
 app.use('/api/', limiter);
@@ -57,7 +58,7 @@ const auth = (req, res, next) => {
 
 // ==================== KẾT NỐI DB ====================
 const uri = process.env.MONGODB_URI;
-mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(uri)
   .then(() => console.log('MongoDB kết nối thành công'))
   .catch(err => {
     console.error('MongoDB lỗi:', err);
