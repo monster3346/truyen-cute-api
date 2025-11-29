@@ -1,0 +1,40 @@
+# ==================== BẢO MẬT - KHÔNG BAO GIỜ COMMIT ====================
+.env
+.DS_Store
+
+# ==================== NODE.JS ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ==================== LOGS ====================
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==================== OS FILES ====================
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==================== IDE/EDITOR ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==================== BUILD OUTPUT ====================
+dist/
+build/
+temp/
+tmp/

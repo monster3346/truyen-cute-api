@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Quản Lý Truyện Cute - Admin Panel</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; color: #333; margin: 0; }
+h1 { color: white; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+input, textarea, button, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; }
+button { background: #ff6b6b; color: white; font-size: 16px; cursor: pointer; transition: all 0.3s; }
+button:hover { background: #ff5252; transform: translateY(-2px); }
+button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+.section { background: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+.section h2 { color: #ff6b6b; border-bottom: 2px solid #ff6b6b; padding-bottom: 10px; }
+.success { color: green; font-weight: bold; padding: 10px; background: #e8f5e9; border-radius: 5px; }
+.error { color: red; font-weight: bold; padding: 10px; background: #ffebee; border-radius: 5px; }
+.story-list { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+.story-item { cursor: pointer; padding: 8px; border-bottom: 1px solid #eee; }
+.story-item:hover { background: #f5f5f5; }
+.story-item:last-child { border-bottom: none; }
+.clear-btn { background: #6c757d; margin-top: 10px; }
+.clear-btn:hover { background: #5a6268; }
+label { font-weight: bold; color: #555; margin-top: 10px; display: block; }
+small { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Quản Lý Truyện Cute - Admin Panel</h1>
+
+<!-- Thiết lập API Key -->
+<div class="section" id="authSection">
+<h2>Xác thực</h2>
+<input type="password" id="apiKey" placeholder="Nhập Admin API Key">
+<button onclick="saveApiKey()">Lưu API Key</button>
+<p id="authStatus" style="color: #666; font-size: 14px;"></p>
+</div>
+
+<!-- Thêm truyện mới -->
+<div class="section" id="addStorySection" style="display:none;">
+<h2>Thêm Truyện Mới</h2>
+<input id="title" placeholder="Tên truyện *">
+<input id="author" placeholder="Tác giả (mặc định: Đang cập nhật)">
+<input id="cover" placeholder="Link ảnh bìa[](https://...)">
+<textarea id="description" rows="4" placeholder="Mô tả ngắn (tối đa 2000 ký tự)"></textarea>
+<input id="genres" placeholder="Thể loại, cách nhau bằng dấu phẩy: Huyền Huyễn, Hài">
+<button onclick="addStory()" id="addStoryBtn">THÊM TRUYỆN</button>
+<button class="clear-btn" onclick="clearStoryForm()">Xóa form</button>
+<p id="storyResult"></p>
+</div>
+
+<!-- Thêm chương -->
+<div class="section" id="addChapterSection" style="display:none;">
+<h2>Thêm Chương Mới</h2>
+<div class="story-list" id="storyList"></div>
+<input id="slug" placeholder="Slug truyện (ví dụ: ta-co-mot-than-phan-thanh) *">
+<input id="number" type="number" placeholder="Số chương *" min="1">
+<input id="chaptitle" placeholder="Tên chương">
+
+<label><input type="radio" name="storyType" value="comic" onclick="toggleStoryType()"> Truyện tranh</label>
+<label><input type="radio" name="storyType" value="novel" onclick="toggleStoryType()" checked> Truyện chữ</label>
+
+<div id="comicSection" style="display:none;">
+<p><strong>Dán link ảnh, mỗi link 1 dòng:</strong></p>
+<textarea id="images" rows="6" placeholder="https://example.com/img1.jpg
+https://example.com/img2.jpg"></textarea>
+</div>
+
+<div id="novelSection">
+<p><strong>Nội dung chương (hỗ trợ HTML cơ bản):</strong></p>
+<textarea id="content" rows="12" placeholder="Nội dung chương ở đây..."></textarea>
+</div>
+
+<button onclick="addChapter()" id="addChapterBtn">THÊM CHƯƠNG</button>
+<button class="clear-btn" onclick="clearChapterForm()">Xóa form</button>
+<p id="chapterResult"></p>
+</div>
+
+<script>
+// === TỰ ĐỘNG LẤY BASE URL THEO MÔI TRƯỜNG ===
+// Ví dụ:
+// - http://localhost:10000/admin      → /api/...
+// - http://127.0.0.1:5500/admin.html → /api/...
+// - https://yourdomain.com/admin      → /api/...
+const API_BASE = "";
+
+// Lấy API Key từ localStorage
+let API_KEY = localStorage.getItem('apiKey') || '';
+
+window.onload = function() {
+  if (API_KEY) {
+    document.getElementById('apiKey').value = API_KEY;
+    document.getElementById('authStatus').innerHTML = '<span class="success">Đã xác thực</span>';
+    document.getElementById('addStorySection').style.display = 'block';
+    document.getElementById('addChapterSection').style.display = 'block';
+    loadStoriesList();
+  } else {
+    document.getElementById('authStatus').innerHTML = '<span class="error">Chưa xác thực</span>';
+  }
+};
+
+function saveApiKey() {
+  const key = document.getElementById('apiKey').value.trim();
+  if (key) {
+    localStorage.setItem('apiKey', key);
+    API_KEY = key;
+    location.reload();
+  } else {
+    alert('Vui lòng nhập API Key!');
+  }
+}
+
+function toggleStoryType() {
+  const type = document.querySelector('input[name="storyType"]:checked').value;
+  document.getElementById('comicSection').style.display = type === 'comic' ? 'block' : 'none';
+  document.getElementById('novelSection').style.display = type === 'novel' ? 'block' : 'none';
+}
+
+async function loadStoriesList() {
+  try {
+    const res = await fetch(`${API_BASE}/api/stories?page=1&limit=100`);
+    const json = await res.json();
+    const list = document.getElementById('storyList');
+    list.innerHTML = '<strong>Chọn truyện:</strong><br>';
+    json.stories.forEach(story => {
+      const div = document.createElement('div');
+      div.className = 'story-item';
+      div.innerHTML = `${story.title} <small>(slug: ${story.slug})</small>`;
+      div.onclick = () => {
+        document.getElementById('slug').value = story.slug;
+        list.scrollIntoView({ behavior: 'smooth' });
+      };
+      list.appendChild(div);
+    });
+  } catch (err) {
+    console.error('Lỗi tải danh sách truyện:', err);
+    document.getElementById('storyList').innerHTML = '<span class="error">Không tải được danh sách truyện</span>';
+  }
+}
+
+function showResult(elementId, message, isSuccess = true) {
+  const el = document.getElementById(elementId);
+  el.className = isSuccess ? 'success' : 'error';
+  el.innerHTML = message;
+  setTimeout(() => el.innerHTML = '', 6000);
+}
+
+function toggleButton(btnId, disabled) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = disabled;
+  btn.textContent = disabled ? 'Đang xử lý...' : (btnId === 'addStoryBtn' ? 'THÊM TRUYỆN' : 'THÊM CHƯƠNG');
+}
+
+// === THÊM TRUYỆN ===
+async function addStory() {
+  if (!API_KEY) return alert('Vui lòng nhập API Key!');
+  const data = {
+    title: document.getElementById('title').value.trim(),
+    author: document.getElementById('author').value.trim() || 'Đang cập nhật',
+    cover: document.getElementById('cover').value.trim(),
+    description: document.getElementById('description').value.trim(),
+    genres: document.getElementById('genres').value.trim()
+  };
+
+  if (!data.title) return alert("Nhập tên truyện đi mà!");
+
+  toggleButton('addStoryBtn', true);
+  showResult('storyResult', 'Đang thêm truyện...', true);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/stories`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+      },
+      body: JSON.stringify(data)
+    });
+
+    const json = await res.json();
+    if (res.ok) {
+      showResult('storyResult', `Thêm thành công!<br>Slug: <b>${json.story.slug}</b>`, true);
+      clearStoryForm();
+      loadStoriesList();
+    } else {
+      showResult('storyResult', `Lỗi: ${json.message || 'Unknown error'}`, false);
+    }
+  } catch (err) {
+    showResult('storyResult', `Lỗi mạng: ${err.message}`, false);
+  } finally {
+    toggleButton('addStoryBtn', false);
+  }
+}
+
+// === THÊM CHƯƠNG ===
+async function addChapter() {
+  if (!API_KEY) return alert('Vui lòng nhập API Key!');
+
+  const slug = document.getElementById('slug').value.trim();
+  const number = document.getElementById('number').value;
+  const title = document.getElementById('chaptitle').value.trim();
+  const type = document.querySelector('input[name="storyType"]:checked').value;
+
+  if (!slug || !number) return alert('Nhập đủ slug + số chương!');
+
+  let data = '';
+  if (type === 'comic') {
+    data = document.getElementById('images').value.split('\n').map(l => l.trim()).filter(Boolean);
+    if (data.length === 0) return alert('Dán ít nhất 1 link ảnh!');
+  } else {
+    data = document.getElementById('content').value.trim();
+    if (!data) return alert('Nhập nội dung chương!');
+  }
+
+  toggleButton('addChapterBtn', true);
+  showResult('chapterResult', 'Đang thêm chương...', true);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/stories/${encodeURIComponent(slug)}/chapter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+      },
+      body: JSON.stringify({ number: parseInt(number), title, type, data })
+    });
+
+    const json = await res.json();
+    if (res.ok) {
+      showResult('chapterResult', json.message || 'Thêm chương thành công!', true);
+      document.getElementById('number').value = parseInt(number) + 1;
+      document.getElementById('chaptitle').value = '';
+      if (type === 'comic') document.getElementById('images').value = '';
+      else document.getElementById('content').value = '';
+    } else {
+      showResult('chapterResult', `Lỗi: ${json.message || 'Unknown'}`, false);
+    }
+  } catch (err) {
+    showResult('chapterResult', `Lỗi mạng: ${err.message}`, false);
+  } finally {
+    toggleButton('addChapterBtn', false);
+  }
+}
+
+function clearStoryForm() {
+  ['title','author','cover','description','genres'].forEach(id => document.getElementById(id).value = '');
+}
+
+function clearChapterForm() {
+  ['slug','number','chaptitle','images','content'].forEach(id => document.getElementById(id).value = '');
+}
+
+// Cảnh báo khi rời trang nếu đang nhập dở
+window.addEventListener('beforeunload', e => {
+  const hasData = document.getElementById('title').value ||
+                  document.getElementById('slug').value ||
+                  document.getElementById('content').value ||
+                  document.getElementById('images').value;
+  if (hasData) {
+    e.preventDefault();
+    e.returnValue = 'Dữ liệu chưa lưu sẽ bị mất!';
+  }
+});
+</script>
+</body>
+</html>
